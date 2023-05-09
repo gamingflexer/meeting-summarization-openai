@@ -159,8 +159,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .vscode/settings.json
-src/requirements.txt
-src/app/requirements.txt
 src/app/fastapidb.sqlite3
 src/temp/*
 test.ipynb

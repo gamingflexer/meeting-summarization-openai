@@ -1,0 +1,8 @@
+gradio==3.28.3
+openai
+openai-async
+asyncio
+nest-asyncio
+transformers==4.26.1
+torch
+jwt

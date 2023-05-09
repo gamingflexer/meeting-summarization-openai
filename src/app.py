@@ -1,38 +1,33 @@
-import uuid
 import logging
-import math
-import os
-import tempfile
-import zipfile
-import time
-import shutil
-from multiprocessing import Pool
-
 import gradio as gr
-import jax.numpy as jnp
-import numpy as np
-from jax.experimental.compilation_cache import compilation_cache as cc
-from transformers.models.whisper.tokenization_whisper import TO_LANGUAGE_CODE
-from transformers.pipelines.audio_utils import ffmpeg_read
+import os
+import zipfile
+import pydub
+import datetime
 
-from whisper_jax import FlaxWhisperPipline
+import openai
+import jwt
 
+from summarizer import count_tokens,main_summarizer_action_items,main_summarizer_meet
+from decouple import config
 
-cc.initialize_cache("./jax_cache")
-checkpoint = "openai/whisper-tiny"
+DEBUG = True
+API_KEY = config('API_KEY')
+model_id = 'whisper-1'
+SECRET_KEY = "$§%§$secret"
 
-DEBUG = False
-BATCH_SIZE = 32
-CHUNK_LENGTH_S = 30
-NUM_PROC = 32
-FILE_LIMIT_MB = 100000
-YT_LENGTH_LIMIT_S = 72000  # limit to 2 hour YouTube files
+# Set the summarization parameters
+# Set the maximum chunk size and tokens per chunk
+max_chunk_size = 2000
+max_tokens_per_chunk = 500
+temperature = 0.7
+top_p = 0.5
+frequency_penalty = 0.5
+temp_dir = os.path.join(os.path.dirname(__file__), 'temp')
 
-title = description = article = " Whisper JAX ⚡️ "
+title = description = article = "Meeting Summariser ⚡️ "
 
-language_names = sorted(TO_LANGUAGE_CODE.keys())
-
-logger = logging.getLogger("whisper-jax-app")
+logger = logging.getLogger("Summariser")
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
@@ -40,138 +35,82 @@ formatter = logging.Formatter("%(asctime)s;%(levelname)s;%(message)s", "%Y-%m-%d
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-temp_path_zip_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
-
-
-def identity(batch):
-    return batch
-
 def authentication(username, password):
-    return username == password
+    if username == "admin" and password == "admin":
+        return True
 
 
-def format_timestamp(seconds: float, always_include_hours: bool = False, decimal_marker: str = "."):
-    if seconds is None:
-        # we have a malformed timestamp so just return it as is
-        return seconds
-    milliseconds = round(seconds * 1000.0)
-
-    hours = milliseconds // 3_600_000
-    milliseconds -= hours * 3_600_000
-
-    minutes = milliseconds // 60_000
-    milliseconds -= minutes * 60_000
-
-    seconds = milliseconds // 1_000
-    milliseconds -= seconds * 1_000
-
-    hours_marker = f"{hours:02d}:" if always_include_hours or hours > 0 else ""
-    return f"{hours_marker}{minutes:02d}:{seconds:02d}{decimal_marker}{milliseconds:03d}"
-
-
-if __name__ == "__main__":
-    pipeline = FlaxWhisperPipline(checkpoint, dtype=jnp.bfloat16, batch_size=BATCH_SIZE)
-    stride_length_s = CHUNK_LENGTH_S / 6
-    chunk_len = round(CHUNK_LENGTH_S * pipeline.feature_extractor.sampling_rate)
-    stride_left = stride_right = round(stride_length_s * pipeline.feature_extractor.sampling_rate)
-    step = chunk_len - stride_left - stride_right
-    pool = Pool(NUM_PROC)
-
-    #do a pre-compile step so that the first user to use the demo isn't hit with a long transcription time
-    logger.info("compiling forward call...")
-    start = time.time()
-    random_inputs = {"input_features": np.ones((BATCH_SIZE, 80, 3000))}
-    random_timestamps = pipeline.forward(random_inputs, batch_size=BATCH_SIZE, return_timestamps=True)
-    compile_time = time.time() - start
-    logger.info(f"compiled in {compile_time}s")
-
-    def tqdm_generate(inputs: dict, task: str, return_timestamps: bool, progress: gr.Progress):
-        inputs_len = inputs["array"].shape[0]
-        all_chunk_start_idx = np.arange(0, inputs_len, step)
-        num_samples = len(all_chunk_start_idx)
-        num_batches = math.ceil(num_samples / BATCH_SIZE)
-        dummy_batches = list(
-            range(num_batches)
-        )  # Gradio progress bar not compatible with generator, see https://github.com/gradio-app/gradio/issues/3841
-
-        dataloader = pipeline.preprocess_batch(inputs, chunk_length_s=CHUNK_LENGTH_S, batch_size=BATCH_SIZE)
-        progress(0, desc="Pre-processing audio file...")
-        logger.info("pre-processing audio file...")
-        dataloader = pool.map(identity, dataloader)
-        logger.info("done post-processing")
-
-        start_time = time.time()
-        logger.info("transcribing...")
-        model_outputs = [
-            pipeline.forward(
-                batch, batch_size=BATCH_SIZE, task=task, return_timestamps=True
-            )
-            for batch, _ in zip(
-                dataloader, progress.tqdm(dummy_batches, desc="Transcribing...")
-            )
-        ]
-        runtime = time.time() - start_time
-        logger.info("done transcription")
-
-        logger.info("post-processing...")
-        post_processed = pipeline.postprocess(model_outputs, return_timestamps=True)
-        text = post_processed["text"]
-        if return_timestamps:
-            timestamps = post_processed.get("chunks")
-            timestamps = [
-                f"[{format_timestamp(chunk['timestamp'][0])} -> {format_timestamp(chunk['timestamp'][1])}] {chunk['text']}"
-                for chunk in timestamps
-            ]
-            text = "\n".join(str(feature) for feature in timestamps)
-        logger.info("done post-processing")
-        return text, runtime
-
-    def transcribe_chunked_audio(inputs, task, return_timestamps, progress=gr.Progress()):
-        progress(0, desc="Loading audio file...")
-        logger.info("loading audio file...")
-        if inputs is None:
-            logger.warning("No audio file")
-            raise gr.Error("No audio file submitted! Please upload an audio file before submitting your request.")
-        file_size_mb = os.stat(inputs).st_size / (1024 * 1024)
-        if file_size_mb > FILE_LIMIT_MB:
-            logger.warning("Max file size exceeded")
-            raise gr.Error(
-                f"File size exceeds file size limit. Got file of size {file_size_mb:.2f}MB for a limit of {FILE_LIMIT_MB}MB."
-            )
-
-        with open(inputs, "rb") as f:
-            inputs = f.read()
-
-        inputs = ffmpeg_read(inputs, pipeline.feature_extractor.sampling_rate)
-        inputs = {"array": inputs, "sampling_rate": pipeline.feature_extractor.sampling_rate}
-        logger.info("done loading")
-        text, runtime = tqdm_generate(inputs, task=task, return_timestamps=return_timestamps, progress=progress)
-        return text, runtime
-
-    audio_chunked = gr.Interface(
-        fn=transcribe_chunked_audio,
-        inputs=[
-            gr.inputs.Audio(source="upload", optional=True, label="Audio file", type="filepath"),
-            gr.inputs.Radio(["transcribe", "translate"], label="Task", default="transcribe"),
-            gr.inputs.Checkbox(default=False, label="Return timestamps"),
-        ],
-        outputs=[
-            gr.outputs.Textbox(label="Transcription").style(show_copy_button=True),
-            gr.outputs.Textbox(label="Transcription Time (s)"),
-        ],
-        allow_flagging="never",
-        title=title,
-        description=description,
-        article=article,
-    )
-
-    demo = gr.Blocks()
-
-    with demo:
-        gr.TabbedInterface([audio_chunked], ["Audio File"])
-
-    demo.queue(concurrency_count=1, max_size=5)
+def transcribe_audio(audio_file_path, temp_folder_path):
     if DEBUG:
-        demo.launch(server_name="0.0.0.0", show_api=False, share=True,auth=authentication)
+        return "This is a test transcription"
+    
+    max_size_bytes = 20 * 1024 * 1024  # 24 MB
+
+    if os.path.getsize(audio_file_path) <= max_size_bytes:
+        media_file = open(audio_file_path, 'rb')
+        response = openai.Audio.transcribe(
+            api_key=API_KEY,
+            model=model_id,
+            file=media_file
+        )
+        return response['text']
     else:
-        demo.launch(server_name="0.0.0.0", show_api=False)
+        sound = pydub.AudioSegment.from_file(audio_file_path, format="mp3")
+        chunks = pydub.utils.make_chunks(sound, max_size_bytes)
+        transcriptions = []
+        for i, chunk in enumerate(chunks):
+            print("chunk ", i)
+            chunk_path = os.path.join(temp_folder_path, f"audio_chunk_{i}.mp3")
+            chunk.export(chunk_path, format="mp3")
+            response = openai.Audio.transcribe(api_key=API_KEY,model=model_id,file=open(chunk_path, 'rb'))
+            transcriptions.append(response['text'])
+
+        return ' '.join(transcriptions)
+
+def download_files(transcription: str, summary: str):
+    time_now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # Create transcription file
+    transcript_file_path = os.path.join(temp_dir, f'transcription_{time_now}.txt')
+    with open(transcript_file_path, 'w') as f:
+        f.write(transcription)
+    # Create summary file
+    summary_file_path = os.path.join(temp_dir, f'summary_{time_now}.txt')
+    with open(summary_file_path, 'w') as f:
+        f.write(summary)
+    # Create zip file
+    zip_file_path = os.path.join(temp_dir, 'download.zip')
+    with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Add transcription file to zip
+        zip_file.write(transcript_file_path, 'transcription.txt')
+        # Add summary file to zip
+        zip_file.write(summary_file_path, 'summary.txt')
+    return zip_file_path
+    
+def clean_trancript(text):
+    return text
+
+def main_meet_summarizer(audio_file):
+    
+    summary = ""
+    transcript = ""
+    action_items = ""
+    
+    print("Starting Transcription")
+    transcript = transcribe_audio(audio_file,temp_dir)
+    print(f"Starting Summarization | {count_tokens(transcript)}")
+    cleaned_transcript = clean_trancript(transcript)
+    summary = main_summarizer_meet(cleaned_transcript, debug=DEBUG)
+    action_items = main_summarizer_action_items(cleaned_transcript, debug=DEBUG)
+    print("Finished Summarization")
+    return summary,transcript,download_files(transcription = transcript, summary = (summary + action_items))
+
+
+summarizer_interface = gr.Interface(
+    fn=main_meet_summarizer,
+    inputs=[gr.inputs.Audio(source='upload', type='filepath', label='Audio File')],
+    outputs=[gr.outputs.Textbox(label='Summary'), gr.outputs.Textbox(label='Transcription'),gr.outputs.File(label="Download files here"),],
+    title='Summarizer',
+    description='Transcribe speech in an audio file & summarize it.',
+)
+
+summarizer_interface.launch(debug=True)

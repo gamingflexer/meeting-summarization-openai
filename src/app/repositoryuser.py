@@ -45,7 +45,7 @@ class SendEmailVerify:
         # create email
       print(
           f"""\\n    #    verify account        
-    http://localhost:8080/user/verify/{self}
+    http://localhost:8000/user/verify/{self}
     """
       )
     # send email

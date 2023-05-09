@@ -6,7 +6,7 @@ from fastapi import HTTPException
  
 from utils.models import UserModel
  
-JWT_SECRET="cairocoders$§%§$Ednalan"
+JWT_SECRET="$§%§$secret"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=3000
  
@@ -23,7 +23,6 @@ def create_access_token(user):
             "email":user.email,
             "role":user.role.value,
             "active":user.is_active,
-
         }
         return  jwt.encode(payload,key=JWT_SECRET,algorithm=ALGORITHM)
     except Exception as ex:

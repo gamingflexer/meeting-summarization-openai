@@ -162,3 +162,5 @@ cython_debug/
 src/requirements.txt
 src/app/requirements.txt
 src/app/fastapidb.sqlite3
+src/temp/*
+test.ipynb

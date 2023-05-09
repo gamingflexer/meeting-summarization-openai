@@ -65,7 +65,8 @@ def signin_user(response:Response,db:Session=Depends(sess_db),username : str = F
             httponly=True,
             expires=1800
         )
-        return {COOKIE_NAME:token,"token_type":"cairocoders"}
+        data = {COOKIE_NAME:token,"token_type":"cairocoders"}
+        return RedirectResponse(url="http://127.0.0.1:7860", status_code=303)
  
 @app.get('/user/verify/{token}')
 def verify_user(token,db:Session=Depends(sess_db)):

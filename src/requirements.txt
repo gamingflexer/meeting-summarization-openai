@@ -6,3 +6,5 @@ nest-asyncio
 transformers==4.26.1
 torch
 jwt
+python-decouple
+moviepy

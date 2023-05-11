@@ -94,7 +94,7 @@ def transcribe_audio(file, temp_dir):
         print("Coverting.. | Error in transcribe_audio: ", e)
         temp_path = os.path.join(temp_dir, f"{str(uuid.uuid4())}.wav")
         subprocess.run(f"ffmpeg -i \"{audio_file_path}\" -ar 16000 -ac 1 -c:a pcm_s16le \"{temp_path}\"", shell=True, check=True)
-        return transcribe_audio(temp_path, temp_folder_path)
+        return transcribe_audio(temp_path, temp_dir)
 
 
 def download_files(transcription: str, summary: str, temp_dir):

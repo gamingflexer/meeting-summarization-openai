@@ -13,7 +13,7 @@ import shutil
 from summarizer import count_tokens, main_summarizer_action_items, main_summarizer_meet
 from decouple import config
 
-DEBUG = True
+DEBUG = False
 API_KEY = config('API_KEY')
 model_id = 'whisper-1'
 SECRET_KEY = "$§%§$secret"

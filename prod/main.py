@@ -26,7 +26,7 @@ async def exception_handler(request: Request, exc: RequiresLoginException) -> Re
     ''' this handler allows me to route the login exception to the login page.'''
     return RedirectResponse(url='/login/')        
 
-
+"""
 @app.middleware("http")
 async def create_auth_header(
     request: Request,
@@ -63,6 +63,40 @@ async def create_auth_header(
 
     return response
 
+"""
+@app.middleware("http")
+async def create_auth_header(
+    request: Request,
+    call_next,):
+    '''
+    Check if there are cookies set for authorization. If so, construct the
+    Authorization header and modify the request (unless the header already
+    exists!)
+    '''
+    if ("Authorization" not in request.headers 
+        and "Authorization" in request.cookies
+        ):
+        access_token = request.cookies["Authorization"]
+        
+        request.headers.__dict__["_list"].append(
+            (
+                "authorization".encode(),
+                 f"Bearer {access_token}".encode(),
+            )
+        )
+    elif ("Authorization" not in request.headers 
+        and "Authorization" not in request.cookies
+        ): 
+        request.headers.__dict__["_list"].append(
+            (
+                "authorization".encode(),
+                 f"Bearer 12345".encode(),
+            )
+        )
+        
+    
+    response = await call_next(request)
+    return response 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("index.html",
@@ -135,11 +169,11 @@ async def create_upload_file(request: Request,file: UploadFile = File(...)):
         await new_file.write(content)
     
     #logic here to process the file
-    client = Client("http://127.0.0.1:7862/")
+    client = Client("http://127.0.0.1:7861/")
     result = client.predict(local_file_path,api_name="/predict")
     
     shutil.copy(result[3], temp_dir_local)
-    zip_location = "http://127.0.0.1:8002/media/" + result[3].split("/")[-1]
+    zip_location = "http://3.143.82.21:7860/media/" + result[3].split("/")[-1]
     
     return templates.TemplateResponse("upload.html",
                 {"request": request,"summary":result[0], "transcript":result[1],"link":zip_location})

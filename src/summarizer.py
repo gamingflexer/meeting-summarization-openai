@@ -5,6 +5,10 @@ import nest_asyncio
 import torch
 from transformers import AutoTokenizer
 
+from decouple import config
+
+API_KEY = config('API_KEY')
+
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
 def count_tokens(text):
@@ -35,7 +39,7 @@ async def summarize_meeting(prompt, timeout, max_tokens):
         api_key = API_KEY,
         timeout=timeout,
         payload={
-            "model": "gpt-3.5-turbo",
+            "model": "text-davinci-003",
             "prompt": prompt,
             "temperature": temperature,
             "max_tokens": max_tokens,

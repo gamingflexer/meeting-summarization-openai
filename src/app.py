@@ -63,31 +63,38 @@ def transcribe_audio(file, temp_dir):
         
     audio_file_path = os.path.join(temp_dir, f"{filename}.{file_extension}")
 
-    if os.path.getsize(audio_file_path) <= max_size_bytes:
-        if DEBUG:
-            return "This is a test transcription"
-        media_file = open(audio_file_path, 'rb')
-        response = openai.Audio.transcribe(
-            api_key=API_KEY,
-            model=model_id,
-            file=media_file
-        )
-        return response['text']
-    else:
-        sound = pydub.AudioSegment.from_file(audio_file_path, format="mp3")
-        chunks = pydub.utils.make_chunks(sound, max_size_bytes)
-        transcriptions = []
-        for i, chunk in enumerate(chunks):
-            print("chunk ", i)
-            chunk_path = os.path.join(temp_dir, f"audio_chunk_{i}.mp3")
-            chunk.export(chunk_path, format="mp3")
+    try:
+
+        if os.path.getsize(audio_file_path) <= max_size_bytes:
             if DEBUG:
                 return "This is a test transcription"
+            media_file = open(audio_file_path, 'rb')
             response = openai.Audio.transcribe(
-                api_key=API_KEY, model=model_id, file=open(chunk_path, 'rb'))
-            transcriptions.append(response['text'])
+                api_key=API_KEY,
+                model=model_id,
+                file=media_file
+            )
+            return response['text']
+        else:
+            sound = pydub.AudioSegment.from_file(audio_file_path, format="mp3")
+            chunks = pydub.utils.make_chunks(sound, max_size_bytes)
+            transcriptions = []
+            for i, chunk in enumerate(chunks):
+                print("chunk ", i)
+                chunk_path = os.path.join(temp_dir, f"audio_chunk_{i}.mp3")
+                chunk.export(chunk_path, format="mp3")
+                if DEBUG:
+                    return "This is a test transcription"
+                response = openai.Audio.transcribe(
+                    api_key=API_KEY, model=model_id, file=open(chunk_path, 'rb'))
+                transcriptions.append(response['text'])
 
-        return ' '.join(transcriptions)
+            return ' '.join(transcriptions)
+    except Exception as e:
+        print("Coverting.. | Error in transcribe_audio: ", e)
+        temp_path = os.path.join(temp_folder_path, f"{str(uuid.uuid4())}.wav")
+        subprocess.run(f"ffmpeg -i \"{audio_file_path}\" -ar 16000 -ac 1 -c:a pcm_s16le \"{temp_path}\"", shell=True, check=True)
+        return transcribe_audio(temp_path, temp_folder_path)
 
 
 def download_files(transcription: str, summary: str, temp_dir):

@@ -73,7 +73,7 @@ def main_summarizer_meet(text, debug=False):
         prompt_response.append(response.json()["choices"][0]["text"].strip())
         prompt_tokens.append(response.json()["usage"]["total_tokens"])
 
-    prompt_request = f"Consoloidate these meeting summaries: {prompt_response}"
+    prompt_request = f"Consoloidate these meeting summaries & don't start with 'At the meeting' : {prompt_response}"
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

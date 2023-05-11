@@ -45,15 +45,20 @@ def authentication(username, password):
         return True
 
 
-def transcribe_audio(file, temp_dir):
+def transcribe_audio(file, temp_dir, retry = False):
     print("Transcribing audio")
     max_size_bytes = 20 * 1024 * 1024  # 24 MB
     os.makedirs(temp_dir, exist_ok=True)
-    shutil.copy(file.name, temp_dir)
-    
-    # check if it video file
-    file_extension = str(file.name).split('.')[-1]
-    filename = os.path.splitext(os.path.basename(file.name))[0]
+
+    if retry is False:
+        shutil.copy(file.name, temp_dir)
+        # check if it video file
+        file_extension = str(file.name).split('.')[-1]
+        filename = os.path.splitext(os.path.basename(file.name))[0]
+    else:
+        file_extension = str(file).split('.')[-1]
+        filename = os.path.splitext(os.path.basename(file))[0]
+
     if file_extension in ['mp4', 'mov', 'avi' , 'webm']:
 
         print(f"Converting video to audio - {filename}.mp3")
@@ -94,7 +99,7 @@ def transcribe_audio(file, temp_dir):
         print("Coverting.. | Error in transcribe_audio: ", e)
         temp_path = os.path.join(temp_dir, f"{str(uuid.uuid4())}.wav")
         subprocess.run(f"ffmpeg -i \"{audio_file_path}\" -ar 16000 -ac 1 -c:a pcm_s16le \"{temp_path}\"", shell=True, check=True)
-        return transcribe_audio(temp_path, temp_dir)
+        return transcribe_audio(temp_path, temp_dir, retry = True)
 
 
 def download_files(transcription: str, summary: str, temp_dir):

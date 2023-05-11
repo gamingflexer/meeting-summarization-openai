@@ -62,7 +62,7 @@ def main_summarizer_meet(text, debug=False):
 
     for i, chunk in enumerate(chunks):
         prompt_request = (
-            f"Summarize this meeting transcript: {tokenizer.decode(chunks[i])}"
+            f"Summarize this transcript: {tokenizer.decode(chunks[i])}"
         )
 
         loop = asyncio.new_event_loop()
@@ -73,12 +73,12 @@ def main_summarizer_meet(text, debug=False):
         prompt_response.append(response.json()["choices"][0]["text"].strip())
         prompt_tokens.append(response.json()["usage"]["total_tokens"])
 
-    prompt_request = f"Consoloidate these meeting summaries & don't start with 'At the meeting' : {prompt_response}"
+    prompt_request = f"Consoloidate these summaries' : {prompt_response}"
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     response = loop.run_until_complete(summarize_meeting(prompt = prompt_request, timeout=45, max_tokens = 1000))
-    return response.json()["choices"][0]["text"].strip()
+    return response.json()["choices"][0]["text"].strip().replace("At the meeting,", "")
 
 # -----------------------------
 

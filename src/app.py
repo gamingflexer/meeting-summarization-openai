@@ -69,7 +69,6 @@ def transcribe_audio(file, temp_dir, retry = False):
     audio_file_path = os.path.join(temp_dir, f"{filename}.{file_extension}")
 
     try:
-
         if os.path.getsize(audio_file_path) <= max_size_bytes:
             if DEBUG:
                 return "This is a test transcription"
@@ -150,10 +149,8 @@ summarizer_interface = gr.Interface(
     
     inputs=[gr.inputs.File( optional=True,
                             label="Audio or Video file", type="file")],
-    outputs=[gr.outputs.Textbox(label='Summary'), gr.outputs.Textbox(label='Transcription'),
-             gr.outputs.File(label="Download files here"),
-             gr.outputs.HTML(label="")
-             ],
+    outputs=[gr.outputs.Textbox(label='Summary').style(show_copy_button=True), gr.outputs.Textbox(label='Transcription').style(show_copy_button=True),
+             gr.outputs.File(label="Download files here")],
     title='Summarizer',
     description='Transcribe speech in an audio/video file & summarize it.',
 )

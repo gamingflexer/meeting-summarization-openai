@@ -1,12 +1,35 @@
-<div  class="container">
-    <div class="row">
-        <div class="row col s6">
-            <h1>{{ success_msg }} {{ USERNAME }}</h1>
-        </div>
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Welcome</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-KK94CHFLLe+nY2dmCWGMq91rCGa5gtU4mk92HdvYe+M/SXH301p5ILy+dN9+nJOZ" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+
+<body>
+  <div class="pt-5 position-relative" style="height: 100vh">
+    <div class="container">
+      <a href="/uploader/" id="downloadLink" class="btn btn-secondary position-absolute" style=" 
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);">
+        Upload <i class="fa form-label"></i>
+      </a>
     </div>
-    <div class="row col s6">
-        <div class="h3">
-            <a href="{{ path_route }}"> {{ path_msg }}</a>
-        </div>
+    <div class="container">
+      <h2 class="mb-4 text-center">Welcome back {{ USERNAME }}</h2>
     </div>
-</div>
+  </div>
+  </div>
+</body>
+{% endblock %}

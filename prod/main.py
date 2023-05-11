@@ -26,44 +26,6 @@ async def exception_handler(request: Request, exc: RequiresLoginException) -> Re
     ''' this handler allows me to route the login exception to the login page.'''
     return RedirectResponse(url='/login/')        
 
-"""
-@app.middleware("http")
-async def create_auth_header(
-    request: Request,
-    call_next,
-):
-    
-    if "Authorization" not in request.cookies:
-        request.headers.__dict__["_list"].append(())
-    
-    elif "Authorization" not in request.headers and "Authorization" in request.cookies:
-        access_token = request.cookies["Authorization"]
-
-        # Check if the Authorization cookie needs to be deleted
-        if "AuthorizationToDelete" not in request.cookies:
-            request.headers.__dict__["_list"].append(
-                (
-                    "authorization".encode(),
-                     f"Bearer {access_token}".encode(),
-                )
-            )
-    elif "Authorization" not in request.headers and "Authorization" not in request.cookies:
-        request.headers.__dict__["_list"].append(
-            (
-                "authorization".encode(),
-                 f"Bearer 12345".encode(),
-            )
-        )
-
-    response = await call_next(request)
-
-    # Check if the AuthorizationToDelete cookie was set
-    if "AuthorizationToDelete" in request.cookies:
-        response.delete_cookie(key="Authorization", path="/")
-
-    return response
-
-"""
 @app.middleware("http")
 async def create_auth_header(
     request: Request,
@@ -93,10 +55,10 @@ async def create_auth_header(
                  f"Bearer 12345".encode(),
             )
         )
-        
     
     response = await call_next(request)
-    return response 
+    return response
+
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("index.html",
@@ -149,6 +111,14 @@ async def sign_in(request: Request, response: Response,
         return templates.TemplateResponse("error.html",
             {"request": request, 'detail': 'Incorrect Username or Password', 'status_code': 401 })
         
+@app.get("/uploader/", response_class=HTMLResponse)
+async def private(request: Request, email=Depends(auth_handler.auth_wrapper)):
+    try:
+        if "Authorization" in request.cookies:
+            return RedirectResponse(url="http://3.143.82.21:7860/", status_code=302)
+    except:
+        raise RequiresLoginException() 
+
 
 @app.get("/upload/", response_class=HTMLResponse)
 async def private(request: Request, email=Depends(auth_handler.auth_wrapper)):

@@ -158,4 +158,4 @@ summarizer_interface = gr.Interface(
     description='Transcribe speech in an audio/video file & summarize it.',
 )
 
-summarizer_interface.launch(debug=True)
+summarizer_interface.launch(debug=True, server_name="0.0.0.0")

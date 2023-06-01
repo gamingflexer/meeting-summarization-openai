@@ -1,9 +1,11 @@
-import openai_async
+import openai_async,openai
 import asyncio
 import nest_asyncio
 
 import torch
 from transformers import AutoTokenizer
+
+API_KEY = ""
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
@@ -31,19 +33,15 @@ async def summarize_meeting(prompt, timeout, max_tokens):
     presence_penalty = 0
     
     # Call the OpenAI GPT-3 API
-    response = await openai_async.complete(
-        api_key = API_KEY,
-        timeout=timeout,
-        payload={
-            "model": "gpt-3.5-turbo",
-            "prompt": prompt,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "top_p": top_p,
-            "frequency_penalty": frequency_penalty,
-            "presence_penalty": presence_penalty
-        },
-    )
+
+    response = openai.ChatCompletion.create(model = 'gpt-3.5-turbo',
+                                            api_key = "",
+                                            messages = [{
+          "role": "system",
+          "content": "You are a helpful assistant for text summarization & title generation.",
+         },{'role': 'user', 'content': prompt}],
+                                            temperature = 0
+                                           )
 
     # Return the generated text
     return response
@@ -65,16 +63,16 @@ def main_summarizer_meet(text, debug=False):
         asyncio.set_event_loop(loop)
 
         response = loop.run_until_complete(summarize_meeting(prompt = prompt_request, timeout=30, max_tokens = 1000))
+        print(response)
 
-        prompt_response.append(response.json()["choices"][0]["text"].strip())
-        prompt_tokens.append(response.json()["usage"]["total_tokens"])
+        prompt_response.append(response["choices"][0]["message"]["content"].strip())
 
     prompt_request = f"Consoloidate these meeting summaries: {prompt_response}"
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     response = loop.run_until_complete(summarize_meeting(prompt = prompt_request, timeout=45, max_tokens = 1000))
-    return response.json()["choices"][0]["text"].strip()
+    return response["choices"][0]["message"]["content"]
 
 # -----------------------------
 
@@ -95,7 +93,6 @@ def main_summarizer_action_items(text, debug=False):
         asyncio.set_event_loop(loop)
         response = loop.run_until_complete(summarize_meeting(prompt = prompt_request, timeout=30, max_tokens = 1000))
 
-        action_response.append(response.json()["choices"][0]["text"].strip())
-        action_tokens.append(response.json()["usage"]["total_tokens"])
+        action_response.append(response["choices"][0]["message"]["content"].strip())
 
     return '\n'.join(action_response)
